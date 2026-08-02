@@ -1,0 +1,31 @@
+// Terrarium docs — true black, matching the console's own palette.
+//
+// Just the Docs derives a scheme by overriding its SCSS variables; this one starts from the
+// bundled `dark` scheme (set in _config.yml) and pushes the surfaces to real black rather
+// than the default slate. The accent is the same amber the product uses for its brand mark,
+// so the docs and the console read as one thing.
+
+// Start from the bundled dark scheme, then push it to black. Without this import the file
+// would override only the variables named below and inherit Just the Docs' LIGHT defaults for
+// everything else — a half-lit theme with black panels and light borders.
+@import "./color_schemes/dark";
+
+$body-background-color: #0b0a09;          // page — true black, not slate
+$sidebar-color: #0e0d0b;                  // nav rail, one step up so it separates
+$search-background-color: #131110;
+$table-background-color: #131110;
+$code-background-color: #131110;
+$feedback-color: #0a0908;         // one step BELOW the sidebar, so it recedes
+
+$border-color: #262220;                   // hairlines, one step off the surfaces
+$body-text-color: #d8d2ca;
+$body-heading-color: #f4efe8;
+$nav-child-link-color: #a49c92;
+$search-result-preview-color: #8b8379;
+
+$link-color: #e6a95e;                     // the brand amber, as in web/app/icon.svg
+$btn-primary-color: #e6a95e;
+$base-button-color: #1a1715;
+
+// Callouts are NOT styled here — Just the Docs configures them in _config.yml, and a
+// $callouts SCSS map is silently inert. See the `callouts:` block there.

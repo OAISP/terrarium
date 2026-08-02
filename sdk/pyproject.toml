@@ -1,0 +1,43 @@
+[project]
+# DISTRIBUTION name (what you `pip install`). The IMPORT name stays `terrarium` — see
+# [tool.hatch.build.targets.wheel] below — so code reads `from terrarium import ...`
+# regardless. The bare `terrarium` name was not available on PyPI.
+name = "terrarium-python"
+version = "0.2.3"
+description = "Async Python client for the Terrarium orchestrator API — manage sandboxed Claude agents and sessions (Claude-Agent-SDK-aligned)."
+readme = "README.md"
+requires-python = ">=3.10"
+# Matches the repository LICENSE. This said MIT while the repo shipped Apache 2.0 — for the
+# one artifact published to a package index, the declared license IS what consumers rely on.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+# Deliberately looser than the orchestrator's floors: this is the one package published for
+# outside consumers, so every floor here is a constraint on THEIR dependency graph. Tested
+# against 0.28.x; 0.27 stays allowed because nothing in the client needs 0.28-only API.
+dependencies = [
+    "httpx>=0.27",
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://oaisp.github.io/terrarium/"
+Documentation = "https://oaisp.github.io/terrarium/sdk/"
+Source = "https://github.com/OAISP/terrarium"
+Issues = "https://github.com/OAISP/terrarium/issues"
+
+[project.scripts]
+terra-cli = "terrarium.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["terrarium"]

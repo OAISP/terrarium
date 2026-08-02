@@ -1,0 +1,85 @@
+[project]
+# Orchestrator distribution (Docker-only, not published). The bare `terrarium` name is
+# reserved for the public SDK (sdk/); the shared lib is the `terracore` import package.
+name = "terrarium-orchestrator"
+version = "0.2.3"
+description = "Sandboxed Claude agents: the Claude Agent SDK runtime in a locked-down container, behind a self-hosted orchestrator API and console."
+readme = "README.md"
+requires-python = ">=3.10"
+# Base deps are what the in-container worker needs. The SDK floor must stay in lockstep with
+# sandbox/Dockerfile, or a local `uv sync` runs the worker against a different SDK than
+# production does.
+dependencies = [
+  "claude-agent-sdk>=0.2.128",
+]
+
+[project.scripts]
+terra = "orchestrator.__main__:main"
+
+[project.optional-dependencies]
+# Kubernetes-native runner (spawn sandbox Pods instead of docker containers).
+k8s = [
+  "kubernetes>=36",
+]
+# Host orchestrator (FastAPI). The sandbox image does NOT install this.
+#
+# Floors track what the suite is actually run against (see uv.lock), not the oldest version
+# that happens to import: a floor below what anything has exercised claims support nobody
+# verified. cryptography is load-bearing (it seals the credential store), so its floor is a
+# real statement about what the sealing has been tested against.
+server = [
+  "fastapi>=0.141",
+  "uvicorn[standard]>=0.52",
+  "cryptography>=49",
+  "python-multipart>=0.0.32",
+]
+
+# The SDK is its own publishable package under sdk/; install it editable for dev
+# so tests/examples can import terrarium.
+[dependency-groups]
+# ruff is the linter `make lint` runs; without it here `uv run ruff` just fails to spawn,
+# so the config below went unenforced on every machine that hadn't installed it globally.
+dev = ["ruff>=0.16", "terrarium-python"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["terracore", "orchestrator"]
+
+# Ruff's defaults disagree with this tree, which runs to ~110 cols and uses deliberate broad
+# excepts at teardown/propagation boundaries (each annotated with why).
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = [".venv", "web", "logs"]
+
+[tool.ruff.lint]
+# Correctness and bug-class rules, NOT style modernization. Deliberately excludes I (import
+# order), UP (Optional[X] → X | None, quoted forward refs) and the line-splitting E rules: the
+# tree consistently uses those forms, so selecting them buries the handful of real findings
+# under hundreds of churn items. Add them with a formatting pass — as its own commit.
+select = ["E4", "E7", "E9", "F", "W", "B", "C4"]
+ignore = [
+  "E501",  # long lines: the tree runs to ~110 cols by design
+  "E701",  # one-line if/else: used deliberately for dense guard clauses
+  "E702",  # same, for paired statements
+  "B008",  # FastAPI's Depends()/File() defaults ARE the documented idiom
+  "B904",  # `raise HTTPException(...)` inside `except` is the API-boundary idiom here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The suites are dependency-free scripts run top-to-bottom, and import inside test functions
+# on purpose so one broken module can't stop the rest of the file from running.
+"tests/*" = ["E402", "F401", "B011", "E401", "E731", "C408"]
+# Import order here is LOAD-ORDER-CRITICAL, not style: conceal_env() must scrub the environment
+# before the heavy Claude SDK import can observe it (see terracore/conceal.py). Moving these
+# imports to the top would defeat the concealment.
+"sandbox/worker.py" = ["E402"]
+# Resolves __version__ from package metadata, then deletes the helpers, before re-exporting the
+# public surface. The re-exports have to follow that block.
+"sdk/terrarium/__init__.py" = ["E402"]
+
+[tool.uv.sources]
+terrarium-python = { path = "sdk", editable = true }

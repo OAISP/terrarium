@@ -1,0 +1,19 @@
+.git
+.venv
+logs
+notes.md
+web
+scripts
+tests
+sdk
+**/__pycache__
+**/*.pyc
+bun.lock
+.next
+node_modules
+# Docs site and CI config are never COPYed by any image; excluding them keeps the context
+# (shared by the root and sandbox builds) from carrying them to the daemon on every build.
+docs
+.github
+.serena
+warden/target

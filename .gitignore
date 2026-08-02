@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# terrarium session logs and scratch (root only — must not swallow web/app/api/logs/)
+/logs/
+notes.md
+
+# Next.js web console
+web/node_modules/
+web/.next/
+web/next-env.d.ts
+web/*.tsbuildinfo
+.env
+
+# Rust
+warden/target/
+
+# Jekyll docs site
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/vendor/
+
+# Tooling caches
+.ruff_cache/
+.serena/
+
+# shunt deploy secrets — resolved locally and streamed to the host over ssh, never committed.
+secrets/
+
+shunt.toml
+# Local-build manifest: points at a personal host, never committed.
+shunt.local.toml

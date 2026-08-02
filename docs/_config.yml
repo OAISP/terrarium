@@ -1,0 +1,64 @@
+title: Terrarium
+description: A self-hosted, single-tenant runtime for autonomous Claude Code agents.
+remote_theme: just-the-docs/just-the-docs
+
+url: https://oaisp.github.io
+baseurl: /terrarium
+
+# Repo link in the sidebar footer + "Edit this page" links.
+gh_edit_link: true
+gh_edit_link_text: Edit this page on GitHub
+gh_edit_repository: https://github.com/OAISP/terrarium
+gh_edit_branch: main
+gh_edit_source: docs
+gh_edit_view_mode: edit
+
+aux_links:
+  GitHub: https://github.com/OAISP/terrarium
+aux_links_new_tab: true
+
+# `terrarium` is defined in _sass/color_schemes/terrarium.scss — a true-black scheme built on
+# the bundled dark one, using the product's own amber accent.
+color_scheme: terrarium
+search_enabled: true
+
+# Jekyll does not read a theme gem's _config.yml, so Just the Docs' own defaults never reach
+# this site — including its layout. Without this block only index.md (which names a layout
+# explicitly) got wrapped; every other page was converted to HTML and served with no <html>,
+# no <head> and no stylesheet, which reads in a browser as an unstyled dump.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# Pretty URLs: /architecture/ rather than /architecture.html. The README and the docs link
+# to the trailing-slash form, which 404s under Jekyll's default `date` permalink style.
+permalink: pretty
+
+# Callouts must be declared HERE. Jekyll does not read a theme gem's _config.yml, so the
+# theme's own defaults never reach this site — without this block every `{: .warning }` in
+# docs/ renders as an ordinary paragraph. Two of them carry the things a reader must not
+# skim (what the DLP scan cannot do; the subscription-token ToS), so `loud` is deliberate:
+# a filled block, not a tinted left border, against a black page.
+callouts_level: loud
+callouts:
+  note:
+    title: Note
+    color: grey-dk
+  important:
+    title: Important
+    color: yellow
+  warning:
+    title: Warning
+    color: red
+heading_anchors: true
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor

@@ -1,0 +1,5 @@
+# Trivy allow-list. The image-scan gate blocks only on FIXABLE CRITICAL CVEs.
+# To allow a specific finding, add a dated, justified entry: one CVE id per line.
+# Example:
+#   # 2026-06-20: no fix available upstream; not reachable in our usage. Re-review by 2026-09.
+#   CVE-2025-12345

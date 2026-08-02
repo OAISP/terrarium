@@ -1,0 +1,166 @@
+name: Release
+
+# Conventional Commits on main decide whether there is a release at all. When there is,
+# semantic-release stamps the version into the tree (scripts/bump-version.sh), commits,
+# tags and publishes the GitHub release — and only then do the artifacts get built, so a
+# published image or wheel always corresponds to a tag.
+# Same filter as CI. semantic-release would already decline to cut a version for `docs:` or
+# `chore:` commits, but only after spinning up the whole gate to find out — so skip the run
+# instead of paying for it. workflow_dispatch stays unfiltered as the manual override.
+#
+# Consequence worth knowing: a `fix:` commit that touches ONLY docs no longer cuts a
+# release on its own. It is not lost — it rides along in the notes of the next release a
+# source change triggers. Use workflow_dispatch if you need one published immediately.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".github/ISSUE_TEMPLATE/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false # never abandon a half-published release
+
+jobs:
+  gate:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: semantic-release
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit the version bump + CHANGELOG, push the tag, create the release
+      issues: write
+      pull-requests: write
+    outputs:
+      published: ${{ steps.semrel.outputs.new_release_published }}
+      version: ${{ steps.semrel.outputs.new_release_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # semantic-release reads the full tag history
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # bump-version.sh refreshes warden/Cargo.lock, which the `cargo test --locked` gate
+      # reads on the next run — without a toolchain here the lock would go stale at the
+      # exact commit that changed the version.
+      - uses: dtolnay/rust-toolchain@stable
+      # semantic-release derives the next version from GIT TAGS, not from pyproject.toml. In a
+      # repository with no tags it does not start from the version in the manifests — it starts
+      # at 1.0.0, unconditionally. That is how a project whose files all said 0.1.0 published
+      # 1.0.0 as its first release. Refuse rather than repeat it: a first release must be
+      # preceded by a deliberate baseline tag.
+      - name: Require a baseline tag
+        run: |
+          if [ -z "$(git tag -l 'v*')" ]; then
+            echo "::error::No v* tag found. semantic-release would start this repository at 1.0.0"
+            echo "::error::regardless of the version in pyproject.toml. Create the baseline first:"
+            echo "::error::  git tag v0.1.0 <first-commit> && git push origin v0.1.0"
+            exit 1
+          fi
+          echo "baseline: $(git describe --tags --abbrev=0)"
+
+      - name: Run semantic-release
+        id: semrel
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            @semantic-release/exec
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  images:
+    name: ${{ matrix.image }} → Docker Hub
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The control plane. Context is the repo root; .dockerignore keeps web/, sdk/
+          # and tests out of it.
+          - image: terrarium-orchestrator
+            context: .
+            dockerfile: Dockerfile
+          # The hardened agent sandbox. Also built from the root, because it compiles
+          # Warden (warden/) and copies the shared terracore package in.
+          - image: terrarium-sandbox
+            context: .
+            dockerfile: sandbox/Dockerfile
+          - image: terrarium-console
+            context: web
+            dockerfile: web/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The release commit carries the stamped version; the default checkout of the
+          # push SHA would build the tree from BEFORE the bump.
+          ref: v${{ needs.release.outputs.version }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/k3scat/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ needs.release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.version }}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # arm64 only where it is cheap. The sandbox image cross-compiles Warden and the
+          # Rust toolchain under QEMU, which takes long enough to be its own problem; add
+          # it back behind a native arm runner rather than by waiting.
+          platforms: ${{ matrix.image == 'terrarium-sandbox' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  sdk:
+    name: SDK → PyPI
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    # Must match the PyPI trusted publisher's "Environment name" EXACTLY. PyPI validates the
+    # environment claim in the OIDC token, and a mismatch is rejected as a permissions error
+    # rather than as a mismatch — so this string is a contract with a setting in another
+    # system, not a label. Change it in both places or neither.
+    environment: publish and release
+    permissions:
+      id-token: write # OIDC trusted publishing — no long-lived token to store or rotate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the SDK
+        run: |
+          python -m pip install --upgrade build
+          python -m build sdk --outdir dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist

@@ -1,0 +1,239 @@
+/* ============================================================================
+   Terrarium Console — Design Tokens  ("Graphite & Ember")  · Tailwind v4
+   Dark is default; light via .light on <html> (next-themes class strategy).
+   oklch, no purple, flat surfaces.
+   ============================================================================ */
+
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* next-themes class strategy; dark = :root, .light is the override */
+@custom-variant light (&:where(.light, .light *));
+
+:root {
+  --bg:          oklch(0.165 0.004 70);
+  --bg-2:        oklch(0.138 0.005 70);
+  --surface:     oklch(0.205 0.005 70);
+  --surface-2:   oklch(0.246 0.006 70);
+  --surface-3:   oklch(0.292 0.007 70);
+  --panel:       oklch(0.200 0.005 70);
+  --border:      oklch(0.300 0.006 70);
+  --border-2:    oklch(0.375 0.008 70);
+  --text:        oklch(0.955 0.004 75);
+  --muted:       oklch(0.775 0.006 73);  /* ≥4.5:1 on surface/panel (WCAG AA) */
+  /* Carries real content (column headers, counts, timestamps, ids, hints, code comments) at ~126
+     sites, so it must clear AA — not just look quiet. Was 0.520 = 3.50/3.25/3.29/2.94/2.55:1 on
+     bg/surface/panel/surface-2/surface-3 (failed everywhere). 0.660 → ≥4.51:1 on all five, and
+     still reads a tier below --muted (0.775). */
+  --faint:       oklch(0.660 0.006 73);  /* ≥4.5:1 on every surface (WCAG AA) */
+
+  --accent:      oklch(0.800 0.105 70);
+  --on-accent:   oklch(0.205 0.020 70);
+
+  --c-agent:     oklch(0.840 0.070 78);
+  --c-user:      oklch(0.740 0.075 245);
+  --c-tool:      oklch(0.752 0.060 195);
+  --c-result:    oklch(0.742 0.072 38);
+  --c-think:     oklch(0.630 0.012 75);
+  --c-error:     oklch(0.662 0.140 28);
+
+  --shadow:      0 1px 2px oklch(0 0 0/0.4), 0 8px 26px -12px oklch(0 0 0/0.5);
+  --shadow-pop:  0 16px 50px -12px oklch(0 0 0/0.65), 0 2px 8px oklch(0 0 0/0.4);
+  --hairline-hi: inset 0 1px 0 oklch(1 0 0/0.035);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-fast: 0.14s;
+  --dur: 0.22s;
+  --dur-slow: 0.34s;
+}
+
+.light {
+  --bg:          oklch(0.975 0.004 80);
+  --bg-2:        oklch(0.958 0.006 80);
+  --surface:     oklch(1 0 0);
+  --surface-2:   oklch(0.976 0.005 80);
+  --surface-3:   oklch(0.950 0.007 80);
+  --panel:       oklch(1 0 0);
+  --border:      oklch(0.902 0.006 80);
+  --border-2:    oklch(0.842 0.008 80);
+  --text:        oklch(0.232 0.006 75);
+  --muted:       oklch(0.438 0.008 75);  /* ≥4.5:1 on white/surface (WCAG AA) */
+  /* Same content role as the dark --faint. Was 0.585 = 3.91/4.20/4.20/3.92/3.63:1 (failed
+     everywhere). 0.533 → ≥4.51:1 on all five surfaces. */
+  --faint:       oklch(0.533 0.008 75);  /* ≥4.5:1 on every surface (WCAG AA) */
+
+  /* --accent does two jobs and must pass BOTH: readable as text/icon ON --bg/--surface (links,
+     hljs keywords, active dock icon) AND dark enough that --on-accent reads on top of it (every
+     primary button). At 0.600 both failed — accent-on-bg 3.76:1, on-accent label 3.95:1 — and the
+     default was the only light preset that failed (clay/teal/slate all pass). 0.535 clears both
+     (4.94:1 on bg, 5.31:1 on surface, 5.18:1 for the label), so no second token is needed. */
+  --accent:      oklch(0.535 0.105 66);
+  --on-accent:   oklch(0.992 0.004 80);
+
+  --c-agent:     oklch(0.520 0.082 72);
+  --c-user:      oklch(0.500 0.100 250);
+  --c-tool:      oklch(0.520 0.078 200);
+  --c-result:    oklch(0.548 0.100 40);
+  --c-think:     oklch(0.550 0.010 75);
+  --c-error:     oklch(0.540 0.160 28);
+
+  --shadow:      0 1px 2px oklch(0 0 0/0.05), 0 10px 28px -14px oklch(0 0 0/0.14);
+  --shadow-pop:  0 20px 56px -14px oklch(0 0 0/0.18), 0 2px 8px oklch(0 0 0/0.07);
+  --hairline-hi: inset 0 1px 0 oklch(1 0 0/0.6);
+}
+
+/* accent presets — data-accent on <html> swaps the single brand hue */
+:root[data-accent="clay"]  { --accent: oklch(0.720 0.115 35);  }
+:root[data-accent="teal"]  { --accent: oklch(0.780 0.070 195); }
+:root[data-accent="slate"] { --accent: oklch(0.730 0.030 245); }
+.light[data-accent="clay"]  { --accent: oklch(0.550 0.135 35);  }
+.light[data-accent="teal"]  { --accent: oklch(0.520 0.090 198); }
+.light[data-accent="slate"] { --accent: oklch(0.480 0.040 250); }
+
+@theme inline {
+  --color-bg:         var(--bg);
+  --color-bg-2:       var(--bg-2);
+  --color-surface:    var(--surface);
+  --color-surface-2:  var(--surface-2);
+  --color-surface-3:  var(--surface-3);
+  --color-panel:      var(--panel);
+  --color-border:     var(--border);
+  --color-border-2:   var(--border-2);
+  --color-text:       var(--text);
+  --color-muted:      var(--muted);
+  --color-faint:      var(--faint);
+  --color-accent:     var(--accent);
+  --color-on-accent:  var(--on-accent);
+  --color-agent:      var(--c-agent);
+  --color-user:       var(--c-user);
+  --color-tool:       var(--c-tool);
+  --color-result:     var(--c-result);
+  --color-think:      var(--c-think);
+  --color-error:      var(--c-error);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-soft: var(--shadow);
+  --shadow-pop:  var(--shadow-pop);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-xs:  0.78125rem;
+  --text-sm:  0.875rem;
+  --text-base:0.90625rem;
+  --text-lg:  1.0625rem;
+  --text-xl:  1.1875rem;
+  --text-stat:2.125rem;
+}
+
+@layer base {
+  * { box-sizing: border-box; border-color: var(--border); }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: color-mix(in oklch, var(--accent) 30%, transparent); }
+
+  /* clickable affordance — Tailwind v4 no longer defaults buttons to pointer */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], summary, label:has(input:not([type="text"])) {
+    cursor: pointer;
+  }
+  button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+
+  /* themed scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+}
+
+@keyframes terra-in      { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes terra-fade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes terra-breathe { 0%,100% { opacity: .45; transform: scale(.82); } 50% { opacity: 1; transform: scale(1.18); } }
+@keyframes terra-ring    { 0%,100% { opacity: .3; transform: scale(1); } 50% { opacity: .6; transform: scale(1.85); } }
+@keyframes terra-blink   { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes terra-shimmer { 100% { transform: translateX(100%); } }
+@keyframes terra-pop     { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes sheet-in      { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  /* …but a spinner is essential FEEDBACK, not decoration. The blanket clamp above stops it after
+     one turn, so "Connecting…" renders a frozen spinner that reads as broken/hung — strictly worse
+     than no spinner. Reduce the distance, never the signal: keep it turning, slowly. */
+  .animate-spin { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+}
+
+@layer base {
+  /* keyboard users always get a visible, accent ring; mouse users don't */
+  /* outline (not box-shadow): a shadow ring is clipped by any overflow-hidden ancestor — e.g. the
+     rounded row list in SessionsView — so the ring silently vanishes on exactly the controls that
+     need it. outline is never clipped and follows the element's own border-radius, so pill controls
+     keep their shape (the old rule forced radius-sm onto every focused target, squaring them off). */
+  :where(a, button, input, textarea, select, summary, [tabindex], [role="button"]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .terra-stream { animation: terra-in var(--dur-slow) var(--ease) both; }
+  .terra-fade-in { animation: terra-fade var(--dur) var(--ease) both; }
+  .caret-blink::after { content: "▌"; margin-left: 1px; color: var(--accent); animation: terra-blink 1s step-end infinite; }
+  /* shared elevated panel surface — keeps every view's cards identical */
+  .panel-card { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+  /* one consistent uppercase eyebrow label for section/stat headings */
+  .eyebrow { font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+  .prose-chat {
+    color: var(--text);
+    font-size: var(--text-base);
+    line-height: 1.6;
+  }
+  .prose-chat :is(p, ul, ol) { margin: 0.7em 0; }
+  .prose-chat code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 5px; }
+  .prose-chat pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
+  .prose-chat pre code { background: none; padding: 0; }
+  .prose-chat a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  /* heading hierarchy (was all one size → looked unparsed) */
+  .prose-chat :is(h1, h2, h3, h4) { font-weight: 600; line-height: 1.3; margin: 0.9em 0 0.35em; }
+  .prose-chat h1 { font-size: 1.35em; }
+  .prose-chat h2 { font-size: 1.2em; }
+  .prose-chat h3 { font-size: 1.08em; }
+  .prose-chat > :first-child { margin-top: 0; }
+  .prose-chat > :last-child { margin-bottom: 0; }
+  /* lists — restore bullets/numbers + indent (Tailwind preflight strips them) */
+  .prose-chat ul { list-style: disc; padding-left: 1.4em; }
+  .prose-chat ol { list-style: decimal; padding-left: 1.4em; }
+  .prose-chat li { margin: 0.2em 0; }
+  .prose-chat li::marker { color: var(--faint); }
+  .prose-chat strong { font-weight: 650; }
+  .prose-chat blockquote { border-left: 2px solid var(--border-2); padding-left: 0.9em; margin: 0.5em 0; color: var(--muted); }
+  .prose-chat hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+  /* GFM tables */
+  .prose-chat table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0.6em 0; font-size: 0.92em; }
+  .prose-chat :is(th, td) { border: 1px solid var(--border); padding: 0.35em 0.6em; text-align: left; }
+  .prose-chat th { background: var(--surface-2); font-weight: 600; }
+  /* highlight.js token theme — keyed to the design tokens so it matches both light/dark */
+  .hljs { color: var(--text); }
+  .hljs-comment, .hljs-quote { color: var(--faint); font-style: italic; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: var(--accent); }
+  .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal, .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: var(--c-agent); }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-meta, .hljs-selector-id, .hljs-selector-class { color: var(--c-user); }
+  .hljs-variable, .hljs-params, .hljs-attr, .hljs-property { color: var(--text); }
+  .hljs-deletion { color: var(--c-error); }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: 600; }
+}

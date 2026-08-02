@@ -1,0 +1,9 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Terrarium">
+  <!-- 6: layered-isolation cradle (the security layers) + emerging sprout -->
+  <path d="M13 37a19 19 0 0 0 38 0" fill="none" stroke="#E6A95E" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M20 37a12 12 0 0 0 24 0" fill="none" stroke="#E6A95E" stroke-width="2.1" stroke-linecap="round" opacity="0.78"/>
+  <path d="M26.5 37a5.5 5.5 0 0 0 11 0" fill="none" stroke="#76B3AB" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+  <path d="M32 37V20.5" fill="none" stroke="#E6A95E" stroke-width="2.3" stroke-linecap="round"/>
+  <path d="M32 27c-.7-4.7-3.9-7.1-8.4-6.9.2 4.5 3.6 7.1 8.4 6.9Z" fill="#E6A95E"/>
+  <path d="M32 24c.7-4.7 3.9-7.1 8.4-6.9-.2 4.5-3.6 7.1-8.4 6.9Z" fill="#EABF8A"/>
+</svg>

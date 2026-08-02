@@ -1,0 +1,24 @@
+# Extend the sandbox image with extra binaries (for the agent's bash) and/or
+# Claude Code plugins. Skills are NOT baked here — they live in skills/ and are
+# mounted read-only at runtime (versionable, no rebuild). Use this file for
+# things that must physically be in the image.
+#
+#   docker build -f sandbox/Dockerfile.extend -t terrarium-sandbox:custom .
+#   TERRA_IMAGE=terrarium-sandbox:custom make run
+FROM terrarium-sandbox:latest
+
+# --- extra tools the agent can call from bash (examples; uncomment as needed) ---
+# USER root
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#         ripgrep jq pandoc poppler-utils \
+#     && rm -rf /var/lib/apt/lists/*
+
+# --- extra Python/Node libraries the agent's code execution may import ---
+# RUN pip3 install --no-cache-dir --break-system-packages pandas matplotlib
+
+# --- Claude Code plugins (vendor a marketplace, install at build time) ---
+# RUN claude plugin marketplace add https://github.com/you/your-marketplace \
+#  && claude plugin install your-plugin@your-marketplace
+
+# Keep the security posture: do not add setuid binaries, do not switch the
+# default user back to root, do not widen capabilities.

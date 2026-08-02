@@ -1,0 +1,90 @@
+name: CI
+
+# Also callable from release.yml, so a release runs the exact same gates rather than a
+# second, drifting copy of them. That means a push to main runs these twice — once here for
+# the badge, once inside the release. Deliberate: gating the release on a run of a *different*
+# commit is the failure this avoids, and a duplicated run is the cheaper mistake.
+# paths-ignore matches only when EVERY changed path matches, so a commit touching both a
+# doc and a source file still runs the full gate. A doc-only change cannot break the build,
+# and running three jobs to prove it wastes minutes and trains people to ignore red.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".github/ISSUE_TEMPLATE/**"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".github/ISSUE_TEMPLATE/**"
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python · lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --extra server --extra k8s
+      - name: Lint
+        run: uv run ruff check .
+      # The lockfile is the only record of what the suite actually ran against; without this
+      # a dependency-floor bump can land without a re-lock and nothing notices.
+      - name: Lockfile is current
+        run: uv lock --check
+      # Each suite discovers its own test_* functions (tests/_runner.py), so this list never
+      # needs touching when a test is added.
+      - name: Tests
+        run: |
+          uv run python tests/test_unit.py
+          uv run python tests/test_sdk.py
+          uv run python tests/test_worker_rewind.py
+
+  warden:
+    name: Warden · clippy + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: warden
+      # Warden holds all destination policy, credential injection and the audit chain, so
+      # its unit tests are the closest thing this pipeline has to a security gate.
+      - run: cargo test --locked --manifest-path warden/Cargo.toml
+      - run: cargo clippy --all-targets --manifest-path warden/Cargo.toml -- -D warnings
+
+  console:
+    name: Console · typecheck + lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      # web/lib/types.ts mirrors the orchestrator's wire shapes by hand, so a silent TS
+      # break is how the two drift apart. (test_unit.py asserts the harness half of that.)
+      - run: bunx tsc --noEmit
+      - run: bun run lint
+      - run: bun run build

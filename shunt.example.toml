@@ -1,0 +1,164 @@
+# Terrarium can also be deployed to a single VPS with shunt (https://github.com/OAISP/shunt).
+#
+# Two services: the orchestrator (control plane, holds the credential and the egress policy)
+# and the console (Next.js UI). Per-session agent sandboxes are NOT declared here — the
+# orchestrator creates and destroys them itself, one per session. shunt never stops a
+# container it was not asked to stop, so it leaves them alone; `shunt plan` will list them as
+# orphaned, which for a sandbox is correct and can be ignored.
+#
+# Before the first deploy, read the two notes at the bottom of this file. One is about the
+# Docker socket, and one is about the terms of service for subscription credentials.
+
+project = "terrarium"
+host    = "deploy@YOUR-VPS-HOSTNAME"
+
+# ── images ───────────────────────────────────────────────────────────────────
+# Built locally and rsynced to the host; no registry involved. Set `platform` to match the
+# VPS — an arm64 laptop building for an amd64 server produces an image that loads without
+# complaint and then exits immediately. `shunt audit` catches the mismatch before you hit it.
+
+[images.orchestrator]
+context    = "."
+dockerfile = "Dockerfile"
+platform   = "linux/amd64"
+
+[images.console]
+context    = "web"
+dockerfile = "web/Dockerfile"
+platform   = "linux/amd64"
+
+# The agent sandbox. It is never run as a service — the orchestrator launches it per session
+# via TERRA_IMAGE — but declaring it here means shunt builds and ships it with everything
+# else, so the image the orchestrator reaches for is always the one this release built.
+[images.sandbox]
+context    = "."
+dockerfile = "sandbox/Dockerfile"
+platform   = "linux/amd64"
+
+# ── orchestrator ─────────────────────────────────────────────────────────────
+# The control plane. It owns the credential, the egress policy and the durable event log, and
+# it spawns sandbox containers through the host's Docker socket.
+
+[services.orchestrator]
+image  = "orchestrator"
+expose = 8900          # no host port: the console reaches it on the deploy network
+drain  = "30s"         # let in-flight turns finish; sandboxes outlive this either way
+
+volumes = [
+  # Event logs, session registry, sealed credential store, drained egress audit. This is the
+  # only stateful thing in the deployment — losing it loses every transcript and the audit
+  # chain that makes them verifiable. Back it up.
+  "terrarium-data:/data",
+  # The orchestrator drives sandboxes by talking to the host's Docker daemon. See the socket
+  # note at the bottom of this file: this mount is the deployment's real trust boundary.
+  "/var/run/docker.sock:/var/run/docker.sock",
+]
+
+[services.orchestrator.env]
+TERRA_RUNNER = "docker"
+TERRA_HOST   = "0.0.0.0"
+# The sandbox image this release built. Keep the tag in step with the console/orchestrator
+# images so a deploy never leaves the orchestrator launching a stale sandbox.
+TERRA_IMAGE  = "terrarium-sandbox:latest"
+# Every session's egress is mediated regardless; this seeds the initial allow-list, and the
+# console manages it from there.
+TERRA_GATEWAY_ALLOW = "github.com,api.github.com,codeload.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,registry.npmjs.org"
+
+[services.orchestrator.health]
+# /readyz is 503 until session rehydration and orphan-reaping finish, so the release is gated
+# on a control plane that has actually recovered its sessions — not merely one that has bound
+# the port. /healthz would go green too early and let the console start against a half-ready API.
+url      = "/readyz"
+retries  = 20
+interval = "3s"
+grace    = "5s"
+
+# ── console ──────────────────────────────────────────────────────────────────
+
+[services.console]
+image    = "console"
+expose   = 3737
+# The console proxies every browser request to the orchestrator, so it must not be swapped in
+# before the API can answer. `requires` is a readiness edge, not just ordering.
+requires = ["orchestrator"]
+
+[services.console.env]
+# Service name on the deploy network. The console is server-side rendered, so this is
+# resolved inside the container and never appears in the browser.
+TERRA_URL = "http://terrarium-orchestrator:8900"
+
+[services.console.health]
+url = "/"
+
+# Blue/green through Traefik, so a deploy does not drop the operator's session. shunt emits
+# the labels and does not run the proxy — bring your own Traefik with a `web`/`websecure`
+# entrypoint and ACME configured, or delete this block and publish a port instead.
+# [services.console.proxy]
+# kind        = "traefik"
+# host        = "terrarium.YOUR-DOMAIN"
+# entrypoints = ["websecure"]
+
+# ── secrets ──────────────────────────────────────────────────────────────────
+# Resolved on your machine and streamed to the host over ssh; never baked into an image.
+#
+# mode = "file" rather than the default "env": with "env" the values come back out of
+# `docker inspect`, and therefore out of anything that captures it — a monitoring agent, a
+# bug report, an image made with `docker commit`. TERRA_TOKEN is the admin bearer for the
+# whole API and TERRA_KEK unseals the credential store, so neither belongs in container
+# metadata.
+#
+# secrets/prod.env (git-ignored) needs:
+#
+#   TERRA_TOKEN=<long random string>      admin bearer for the API and console login
+#   TERRA_KEK=<32-byte base64 or a passphrase>
+#   ANTHROPIC_API_KEY=sk-ant-...          optional; see the ToS note below
+#
+# Set a real TERRA_KEK. Without one the stores fall back to sealing under TERRA_TOKEN, so
+# rotating the API token re-keys the credential store — and for operator secrets, which have
+# no seed to recover from, it makes them permanently undecryptable.
+
+[secrets]
+provider = "file"
+path     = "secrets/prod.env"
+mode     = "file"
+
+# ── staging (optional) ───────────────────────────────────────────────────────
+# Delete this block if you deploy to one server. `shunt up -t staging` targets it.
+#
+# [targets.staging]
+# host = "deploy@staging.YOUR-DOMAIN"
+#
+# [targets.staging.secrets]
+# provider = "file"
+# path     = "secrets/staging.env"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Before the first deploy
+#
+# 1. THE DOCKER SOCKET IS THE TRUST BOUNDARY.
+#    Mounting it gives the orchestrator container root-equivalent control of the host. That
+#    is inherent to spawning sibling containers and is why the ORCHESTRATOR holds it and the
+#    sandbox never does — the sandbox is the untrusted half, and it gets a default-drop
+#    firewall and a decoy credential instead. Treat the orchestrator as a trusted component,
+#    keep TERRA_TOKEN strong, and do not expose :8900 to the internet.
+#
+#    No host-side permission setup is needed. The socket is root:docker 0660 and the docker
+#    GID differs per host, so the image cannot bake it in; the entrypoint reads the mounted
+#    socket's GID at startup, joins that group, and drops to uid 1000 before the app runs.
+#    Releases before 0.2.3 did not, and needed `setfacl -m u:1000:rw /var/run/docker.sock`
+#    re-applied after every daemon restart.
+#
+#    Note that being in the `docker` group on the HOST does nothing for this: group
+#    membership is resolved from the container's own /etc/group, never the host's.
+#
+# 2. CHECK THE TERMS OF SERVICE BEFORE USING A SUBSCRIPTION CREDENTIAL.
+#    Running a Claude *subscription* token through Terrarium's MITM is against Anthropic's
+#    ToS for that token type. The API-key path (ANTHROPIC_API_KEY) carries no such
+#    restriction. This is a decision to make deliberately, not a default to inherit —
+#    see docs/security.md.
+#
+# 3. VERIFY, THEN DEPLOY.
+#        shunt validate     # schema only; no ssh, no build
+#        shunt audit        # platform vs host architecture, and more
+#        shunt plan         # what would change
+#        shunt up
