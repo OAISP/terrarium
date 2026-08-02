@@ -1,6 +1,6 @@
 [package]
 name = "warden"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "Terrarium Warden — per-session MITM egress gateway (credential injection + content scan + allow-list/audit)"
 

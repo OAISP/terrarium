@@ -3,7 +3,7 @@
 # [tool.hatch.build.targets.wheel] below — so code reads `from terrarium import ...`
 # regardless. The bare `terrarium` name was not available on PyPI.
 name = "terrarium-python"
-version = "0.2.3"
+version = "0.2.4"
 description = "Async Python client for the Terrarium orchestrator API — manage sandboxed Claude agents and sessions (Claude-Agent-SDK-aligned)."
 readme = "README.md"
 requires-python = ">=3.10"

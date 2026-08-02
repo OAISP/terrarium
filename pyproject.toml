@@ -2,7 +2,7 @@
 # Orchestrator distribution (Docker-only, not published). The bare `terrarium` name is
 # reserved for the public SDK (sdk/); the shared lib is the `terracore` import package.
 name = "terrarium-orchestrator"
-version = "0.2.3"
+version = "0.2.4"
 description = "Sandboxed Claude agents: the Claude Agent SDK runtime in a locked-down container, behind a self-hosted orchestrator API and console."
 readme = "README.md"
 requires-python = ">=3.10"
