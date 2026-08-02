@@ -3347,6 +3347,73 @@ def test_concurrent_memory_is_isolated_on_every_runner():
     print("ok  memory: concurrent runs isolate on every runner, not just k8s")
 
 
+def test_preflight_reports_missing_sandbox_image():
+    """A missing TERRA_IMAGE must fail readiness, not the first session. shunt and Compose do
+    not pull it (the sandbox is not a service), so a bad tag used to surface as
+    "warden sidecar failed to start" when someone launched an agent."""
+    import asyncio
+
+    from orchestrator import runners
+
+    calls = []
+
+    async def fake_run(cmd):
+        calls.append(cmd[:3])
+        return (1, "Error response from daemon: manifest unknown")
+
+    orig, runners._run = runners._run, fake_run
+    try:
+        cfg = Config(runner="docker", image="ghost:nope", runtime_dir=Path(tempfile.mkdtemp()))
+        err = asyncio.run(runners.preflight_image(cfg))
+        assert err and "ghost:nope" in err and "could not be pulled" in err
+        assert ["docker", "image", "inspect"] in calls   # checks presence first
+        assert ["docker", "pull", "ghost:nope"] in calls  # then tries to fetch it
+
+        # present image → no error, and no pull attempted
+        calls.clear()
+
+        async def ok(cmd):
+            calls.append(cmd[:3])
+            return (0, "")
+
+        runners._run = ok
+        assert asyncio.run(runners.preflight_image(cfg)) is None
+        assert ["docker", "pull", "ghost:nope"] not in calls
+
+        # other runners have no image to check
+        for r in ("k8s", "local"):
+            c2 = Config(runner=r, image="ghost:nope", runtime_dir=Path(tempfile.mkdtemp()))
+            assert asyncio.run(runners.preflight_image(c2)) is None
+    finally:
+        runners._run = orig
+    print("ok  preflight: missing sandbox image fails readiness, not the first session")
+
+
+def test_warden_failure_reports_container_diagnostics():
+    """A dead sidecar has no IP; the reason is its exit code and logs. Those used to be
+    discarded by `docker rm -f` before anything read them, so a missing cred, a read-only
+    mount and a registry outage all printed the same 'could not resolve IP'."""
+    import asyncio
+
+    from orchestrator.warden import WardenController
+
+    cfg = Config(runtime_dir=Path(tempfile.mkdtemp()))
+    ctl = WardenController(cfg, "ses_diag", None)
+
+    async def fake_docker(*args):
+        if args[0] == "inspect":
+            return 0, "exited exit=1"
+        if args[0] == "logs":
+            return 0, "Error: Permission denied (os error 13)"
+        return 0, ""
+
+    ctl._docker = fake_docker
+    why = asyncio.run(ctl._why_dead())
+    assert "exited exit=1" in why
+    assert "Permission denied" in why
+    print("ok  warden: failure reports the container's exit code and logs")
+
+
 def main() -> int:
     return run(globals(), "ALL UNIT TESTS PASSED")
 

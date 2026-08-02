@@ -62,6 +62,23 @@ class WardenController:
         out, _ = await p.communicate()
         return p.returncode or 0, out.decode(errors="replace")
 
+    async def _why_dead(self) -> str:
+        """Why the container is not up, from the container itself.
+
+        `could not resolve IP` is a symptom: a container that exited has no address. The cause
+        is in its logs and exit code, and the old code removed the container before reading
+        either — so a missing cred file, a read-only mount and an unreachable registry all
+        produced the same unhelpful line."""
+        rc, state = await self._docker("inspect", "-f", "{{.State.Status}} exit={{.State.ExitCode}}",
+                                       self.name)
+        rc2, logs = await self._docker("logs", "--tail", "5", self.name)
+        bits = []
+        if rc == 0 and state.strip():
+            bits.append(state.strip())
+        if rc2 == 0 and logs.strip():
+            bits.append("log: " + " | ".join(logs.strip().splitlines()[-3:]))
+        return "; ".join(bits) or "no diagnostics available"
+
     async def _ip(self) -> str | None:
         for _ in range(20):
             rc, out = await self._docker("inspect", "-f", "{{json .NetworkSettings.Networks}}", self.name)
@@ -149,14 +166,16 @@ class WardenController:
 
         ip = await self._ip()
         if not ip:
-            print("[warden] could not resolve IP — disabling", file=sys.stderr)
+            # Read the diagnostics BEFORE removing the container, or the reason is lost.
+            print(f"[warden] no IP — sidecar is not running: {await self._why_dead()}",
+                  file=sys.stderr)
             await self._docker("rm", "-f", self.name)
             return None
         # The worker must trust the CA before it starts, and the CA now lives inside the
         # container, so copy it out rather than watching a shared directory.
         self.ca_pem = await self._await_ca()
         if not self.ca_pem:
-            print("[warden] CA never appeared — disabling", file=sys.stderr)
+            print(f"[warden] CA never appeared: {await self._why_dead()}", file=sys.stderr)
             await self._docker("rm", "-f", self.name)
             return None
         self.endpoint = (ip, c.warden_port)

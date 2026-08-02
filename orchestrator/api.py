@@ -413,6 +413,13 @@ def create_app(config: Config | None = None) -> FastAPI:
             await app.state.manager.propagate_egress_policy()
         except Exception as e:  # never block startup on propagation
             logging.getLogger("terrarium").warning("post-rehydrate policy propagation: %s", e)
+        # Fail readiness on a missing sandbox image rather than letting the first session
+        # discover it. A deploy that reports success and then cannot launch an agent is the
+        # worst of both: shunt goes green, and the error names Warden.
+        from .runners import preflight_image
+        app.state.image_error = await preflight_image(config)
+        if app.state.image_error:
+            logging.getLogger("terrarium").error("%s", app.state.image_error)
         app.state.ready = True
         try:
             yield
@@ -508,6 +515,9 @@ def create_app(config: Config | None = None) -> FastAPI:
         # routed mid-recovery (the chart points its readinessProbe here).
         if not getattr(request.app.state, "ready", False):
             raise HTTPException(status_code=503, detail="not ready (recovering sessions)")
+        err = getattr(request.app.state, "image_error", None)
+        if err:
+            raise HTTPException(status_code=503, detail=err)
         return {"ready": True}
 
     @app.get("/v1/me")

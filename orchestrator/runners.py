@@ -316,6 +316,30 @@ class _PipeRunner(Runner):
             yield item
 
 
+async def preflight_image(config: Config) -> str | None:
+    """Check the sandbox image is present, returning an error string if it is not.
+
+    shunt (and Compose) will not pull TERRA_IMAGE: the sandbox is not a service, so nothing in
+    a manifest references it. `docker run` would auto-pull it at the first session, which means
+    a bad tag, a missing login or a registry outage surfaces when someone launches an agent
+    rather than when the deploy runs — reported as "warden sidecar failed to start", which
+    names the wrong component.
+
+    Only meaningful for the docker runner. The k8s runner defers image pulls to the kubelet,
+    and the local runner has no image at all."""
+    if config.runner != "docker" or os.environ.get("TERRA_SKIP_IMAGE_CHECK"):
+        return None
+    rc, _ = await _run(["docker", "image", "inspect", config.image])
+    if rc == 0:
+        return None
+    rc, out = await _run(["docker", "pull", config.image])
+    if rc == 0:
+        return None
+    return (f"sandbox image {config.image!r} is not present and could not be pulled: "
+            f"{out.strip().splitlines()[-1] if out.strip() else 'unknown error'}. "
+            f"Pull it on the host, or set TERRA_SKIP_IMAGE_CHECK=1 to start anyway.")
+
+
 # Sentinel for "the CA Warden just minted" — bytes in memory rather than a path.
 _CA_PEM = object()
 
